@@ -9,7 +9,7 @@ import logging
 import time
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, Type, Optional
+from typing import Any, Dict, Optional, Type
 from uuid import uuid4
 
 import boto3
@@ -45,7 +45,14 @@ class TranscribeJobStatus(str, Enum):
     ERROR = "error"
 
 
-SUPPORTED_MIME_TYPES = (MimeTypes.MP3, MimeTypes.WAV, "video/mp4", "audio/mp4", "audio/webm", "video/webm")
+SUPPORTED_MIME_TYPES = (
+    MimeTypes.MP3,
+    MimeTypes.WAV,
+    "video/mp4",
+    "audio/mp4",
+    "audio/webm",
+    "video/webm",
+)
 BASE_URL = "https://api.assemblyai.com/v2"
 
 
@@ -64,21 +71,18 @@ class AssemblyAIBlockifier(Blockifier):
         """Return the Configuration class."""
         return AssemblyAIBlockifierConfig
 
-    def transcribe_audio_file(
-            self, file_uri: str
-    ) -> Optional[Dict[str, Any]]:
+    def transcribe_audio_file(self, file_uri: str) -> Optional[Dict[str, Any]]:
         """Transcribe an audio file stored on s3."""
         # Transcribe audio file
         headers = {
             "authorization": self.config.assembly_ai_api_token,
-            "content-type": "application/json"
+            "content-type": "application/json",
         }
-        response = requests.post(f"{BASE_URL}/transcript",
-                                 json={
-                                     "audio_url": file_uri,
-                                     "speaker_labels": self.config.speaker_detection
-                                 },
-                                 headers=headers)
+        response = requests.post(
+            f"{BASE_URL}/transcript",
+            json={"audio_url": file_uri, "speaker_labels": self.config.speaker_detection},
+            headers=headers,
+        )
 
         response_json = response.json()
         transcript_id = response_json.get("id")
@@ -92,7 +96,10 @@ class AssemblyAIBlockifier(Blockifier):
             response_json = response.json()
             job_status = response_json["status"]
 
-            if response_json["status"] in {TranscribeJobStatus.COMPLETED, TranscribeJobStatus.ERROR}:
+            if response_json["status"] in {
+                TranscribeJobStatus.COMPLETED,
+                TranscribeJobStatus.ERROR,
+            }:
                 logging.info(f"Job {transcript_id} has status {job_status}.")
                 if job_status == TranscribeJobStatus.COMPLETED:
                     return response_json
@@ -125,9 +132,10 @@ class AssemblyAIBlockifier(Blockifier):
 
         # Generate presigned url
         signed_url = s3_client.generate_presigned_url(
-            ClientMethod='get_object',
-            Params={'Bucket': self.config.aws_s3_bucket_name, 'Key': unique_file_id},
-            ExpiresIn=3600)
+            ClientMethod="get_object",
+            Params={"Bucket": self.config.aws_s3_bucket_name, "Key": unique_file_id},
+            ExpiresIn=3600,
+        )
 
         # Start Assembly AI Transcription
 
@@ -178,7 +186,7 @@ class AssemblyAIBlockifier(Blockifier):
         else:
             raise SteamshipError(
                 message="Transcription of file was unsuccessful. "
-                        "Please check Amazon Transcribe for error message."
+                "Please check Amazon Transcribe for error message."
             )
 
 

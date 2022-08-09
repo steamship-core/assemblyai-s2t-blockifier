@@ -3,7 +3,6 @@ from test import TEST_DATA
 from test.utils import load_config, verify_response
 
 import pytest as pytest
-from steamship import MimeTypes, Tag
 from steamship.plugin.inputs.raw_data_plugin_input import RawDataPluginInput
 from steamship.plugin.service import PluginRequest
 
@@ -29,4 +28,3 @@ def test_blockifier(speaker_detection):
     response = blockifier.run(request)
 
     verify_response(response, speaker_detection)
-

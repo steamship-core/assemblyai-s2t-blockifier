@@ -31,6 +31,7 @@ class AssemblyAIBlockifierConfig(Config):
     aws_s3_bucket_name: str
     assembly_ai_api_token: str
     speaker_detection: bool = True
+    enable_audio_intelligence: bool = True
     language_code: str = "en-US"
     max_retries: int = 60
     retry_timeout: int = 10
@@ -80,7 +81,16 @@ class AssemblyAIBlockifier(Blockifier):
         }
         response = requests.post(
             f"{BASE_URL}/transcript",
-            json={"audio_url": file_uri, "speaker_labels": self.config.speaker_detection},
+            json={
+                "audio_url": file_uri,
+                "speaker_labels": self.config.speaker_detection,
+                "language_detection": True,
+                "auto_highlights": self.config.enable_audio_intelligence,
+                "iab_categories": self.config.enable_audio_intelligence,
+                "sentiment_analysis": self.config.enable_audio_intelligence,
+                "auto_chapters": self.config.enable_audio_intelligence,
+                "entity_detection": self.config.enable_audio_intelligence,
+            },
             headers=headers,
         )
 
@@ -138,8 +148,8 @@ class AssemblyAIBlockifier(Blockifier):
         )
 
         # Start Assembly AI Transcription
-
         transcription_response = self.transcribe_audio_file(file_uri=signed_url)
+
         if transcription_response:
             tags = []
             utterance_index = 0
@@ -171,6 +181,17 @@ class AssemblyAIBlockifier(Blockifier):
                         )
                         word_index += word_length + 1
 
+            # Parse topics
+            tags.extend(self._parse_topics(transcription_response))
+
+            tags.extend(self._parse_summary(transcription_response))
+
+            tags.extend(self._parse_sentiments(transcription_response))
+
+            tags.extend(self._parse_chapters(transcription_response))
+
+            tags.extend(self._parse_entities(transcription_response))
+
             return Response(
                 data=BlockAndTagPluginOutput(
                     file=File.CreateRequest(
@@ -188,6 +209,107 @@ class AssemblyAIBlockifier(Blockifier):
                 message="Transcription of file was unsuccessful. "
                 "Please check Amazon Transcribe for error message."
             )
+
+    @staticmethod
+    def _parse_entities(transcription_response):
+        tags = []
+        if "entities" in transcription_response:
+            entities = transcription_response["entities"]
+            for entity in entities:
+                tags.append(
+                    Tag.CreateRequest(
+                        kind="entities",
+                        name=entity["entity_type"],
+                        value={"value": entity["text"]},
+                        start_idx=None,  # TODO
+                        end_idx=None,  # TODO
+                    )
+                )
+        return tags
+
+    @staticmethod
+    def _parse_chapters(transcription_response):
+        tags = []
+        if "chapters" in transcription_response:
+            chapters = transcription_response["chapters"]
+            for chapter in chapters:
+                tags.append(
+                    Tag.CreateRequest(
+                        kind="chapter",
+                        value={
+                            "summary": chapter["summary"],
+                            "headline": chapter["headline"],
+                            "gist": chapter["gist"],
+                            "start_time": chapter["start"],
+                            "end_time": chapter["end"],
+                        },
+                        start_idx=None,  # TODO
+                        end_idx=None,  # TODO
+                    )
+                )
+        return tags
+
+    @staticmethod
+    def _parse_sentiments(transcription_response):
+        tags = []
+        if "sentiment_analysis_results" in transcription_response:
+            sentiment_analysis_results = transcription_response["sentiment_analysis_results"]
+            ix = 0
+            for sentiment in sentiment_analysis_results:
+                span_text = sentiment["text"]
+                tags.append(
+                    Tag.CreateRequest(
+                        kind="sentiments",
+                        name=sentiment["sentiment"],
+                        value={"span_text": span_text, "confidence": sentiment["confidence"]},
+                        start_idx=ix,
+                        end_idx=ix + len(span_text),
+                    )
+                )
+                ix += len(span_text) + 1
+        return tags
+
+    @staticmethod
+    def _parse_summary(transcription_response):
+        tags = []
+        if "summary" in transcription_response.get("iab_categories_result", {}):
+            summary = transcription_response["iab_categories_result"]["summary"]
+            for topic, relevance in summary.items():
+                tags.append(
+                    Tag.CreateRequest(
+                        kind="topic_summary",
+                        name=topic,
+                        value={"relevance": relevance},
+                        end_idx=None,
+                        start_idx=None,
+                    )
+                )
+        return tags
+
+    @staticmethod
+    def _parse_topics(transcription_response):
+        tags = []
+        if "results" in transcription_response.get("iab_categories_result", {}):
+            topics = transcription_response["iab_categories_result"]["results"]
+            ix = 0
+            for topic_fragment in topics:
+                topic_length = len(topic_fragment["text"])
+                for label in topic_fragment["labels"]:
+                    tags.append(
+                        Tag.CreateRequest(
+                            kind="topic",
+                            name=label["label"],
+                            value={
+                                "span_text": topic_fragment["text"],
+                                "relevance": label["relevance"],
+                            },
+                            start_idx=ix,
+                            end_idx=ix + topic_length,
+                        )
+                    )
+                ix += topic_length + 1
+
+        return tags
 
 
 handler = create_handler(AssemblyAIBlockifier)

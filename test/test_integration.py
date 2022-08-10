@@ -9,7 +9,7 @@ from steamship import File, Plugin, PluginInstance, Steamship
 from steamship.base.mime_types import MimeTypes
 
 BLOCKIFIER_HANDLE = "assemblyai-s2t-blockifier"
-ENVIRONMENT = "prod"
+ENVIRONMENT = "test"
 
 
 def _get_plugin_instance(client: Steamship, handle: str, config: Dict[str, Any]) -> PluginInstance:

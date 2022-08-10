@@ -14,7 +14,7 @@ def _read_test_audio_file(filename: str) -> str:
         return f.read()
 
 
-@pytest.mark.parametrize("speaker_detection", (True, False))
+@pytest.mark.parametrize("speaker_detection", (True,))
 def test_blockifier(speaker_detection):
     """Test Amazon Transcribe (S2T) Blockifier without edge cases."""
     config = load_config()

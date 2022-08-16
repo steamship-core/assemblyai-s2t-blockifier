@@ -35,3 +35,6 @@ def verify_block_tags(block):
     """Verify the block."""
     assert len(block.tags) > 0
     assert isinstance(block.tags[0], (Tag, Tag.CreateRequest))
+
+    for tag in block.tags:
+        assert tag.name is not None

@@ -5,19 +5,17 @@ from test.utils import load_config, verify_file
 from typing import Any, Dict
 
 import pytest
-from steamship import File, Plugin, PluginInstance, Steamship
+from steamship import File, PluginInstance, Steamship
 from steamship.base.mime_types import MimeTypes
+from steamship.data import Plugin
 
 BLOCKIFIER_HANDLE = "assemblyai-s2t-blockifier"
-ENVIRONMENT = "test"
+ENVIRONMENT = "staging"
 
 
 def _get_plugin_instance(client: Steamship, handle: str, config: Dict[str, Any]) -> PluginInstance:
-    plugin = Plugin.get(client, handle).data
-    assert plugin is not None
-    assert plugin.id is not None
     plugin_instance = PluginInstance.create(
-        client, plugin_handle=handle, upsert=True, plugin_id=plugin.id, config=config
+        client, plugin_handle=handle, upsert=True, config=config
     ).data
     assert plugin_instance is not None
     assert plugin_instance.id is not None
@@ -33,7 +31,10 @@ def test_blockifier(speaker_detection):
     blockifier = _get_plugin_instance(client=client, handle=BLOCKIFIER_HANDLE, config=config)
     audio_path = TEST_DATA / "test_conversation.mp3"
     file = File.create(client, filename=str(audio_path.resolve()), mime_type=MimeTypes.MP3).data
-    file.blockify(plugin_instance=blockifier.handle).wait(max_timeout_s=600, retry_delay_s=60)
+
+    blockify_response = file.blockify(plugin_instance=blockifier.handle)
+    blockify_response.wait(max_timeout_s=3600, retry_delay_s=5)
+
     file = file.refresh().data
 
     verify_file(file, speaker_detection)

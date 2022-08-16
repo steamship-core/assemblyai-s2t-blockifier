@@ -6,48 +6,22 @@
   "description": "Blockifies audio via Assembly AI",
   "public": true,
   "type": "plugin",
-  "version": "0.0.17",
+  "version": "0.0.26",
   "plugin": {
     "isTrainable": false,
     "transport": "jsonOverHttp",
     "type": "blockifier"
   },
   "configTemplate": {
-    "aws_access_key_id": {
-      "type": "string",
-      "description": "AWS Access key that grants access to s3 and Amazon Transcribe."
-    },
-    "aws_secret_access_key": {
-      "type": "string",
-      "description": "AWS Secret Access key that grans access to s3 and Amazon Transcribe."
-    },
-    "aws_s3_bucket_name": {
-      "type": "string",
-      "description": "S3 bucket where the audio file and transcript will be stored."
-    },
     "speaker_detection": {
       "type": "boolean",
       "description": "Enable speaker detection.",
       "default": true
     },
-    "assembly_ai_api_token": {
-      "type": "string",
-      "description": "API Token to access Assembly AI's API."
-    },
-    "language_code": {
-      "type": "string",
-      "description": "Language identifier of the dominant language spoken in the audio.",
-      "default": "en-US"
-    },
-    "max_retries": {
-      "type": "number",
-      "description": "The number of times to poll AWS Transcribe for results.",
-      "default": 60
-    },
-    "retry_timeout": {
-      "type": "number",
-      "description": "The polling period in seconds between subsequent check to AWS Transcribe for results.",
-      "default": 10
+    "enable_audio_intelligence": {
+      "type": "boolean",
+      "description": "Enable audio intelligence.",
+      "default": true
     }
   }
 }

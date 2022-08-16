@@ -4,37 +4,41 @@ A JSON file containing a list of tickets (produced by the zendesk-file-importer)
  and parsed into a list of blocks. Each block contains one or more tags extracted from the
  fields reference in the config.
 """
-import io
 import logging
-import time
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, Optional, Type
+from typing import Any, Dict, Type, Union
 from uuid import uuid4
 
-import boto3
 import requests
-from steamship import Block, File, SteamshipError, Tag
+from steamship import Block, File, Steamship, SteamshipError
 from steamship.app import Response, create_handler
+from steamship.base import Task, TaskState
 from steamship.base.mime_types import MimeTypes
+from steamship.data.space import SignedUrl
 from steamship.plugin.blockifier import Blockifier, Config
 from steamship.plugin.inputs.raw_data_plugin_input import RawDataPluginInput
 from steamship.plugin.outputs.block_and_tag_plugin_output import BlockAndTagPluginOutput
 from steamship.plugin.service import PluginRequest
+from steamship.utils.signed_urls import upload_to_signed_url
+
+from keys import ASSEMBLY_API_TOKEN
+from parsers import (
+    parse_chapters,
+    parse_entities,
+    parse_sentiments,
+    parse_speaker_tags,
+    parse_summary,
+    parse_timestamps,
+    parse_topics,
+)
 
 
 class AssemblyAIBlockifierConfig(Config):
-    """Config object containing required configuration parameters to initialize a AmazonTranscribeBlockifier."""
+    """Config object containing required configuration parameters to initialize a AssemblyAIBlockifier."""
 
-    aws_access_key_id: str
-    aws_secret_access_key: str
-    aws_s3_bucket_name: str
-    assembly_ai_api_token: str
     speaker_detection: bool = True
     enable_audio_intelligence: bool = True
-    language_code: str = "en-US"
-    max_retries: int = 60
-    retry_timeout: int = 10
 
 
 class TranscribeJobStatus(str, Enum):
@@ -44,17 +48,6 @@ class TranscribeJobStatus(str, Enum):
     PROCESSING = "processing"
     COMPLETED = "completed"
     ERROR = "error"
-
-
-SUPPORTED_MIME_TYPES = (
-    MimeTypes.MP3,
-    MimeTypes.WAV,
-    "video/mp4",
-    "audio/mp4",
-    "audio/webm",
-    "video/webm",
-)
-BASE_URL = "https://api.assemblyai.com/v2"
 
 
 class AssemblyAIBlockifier(Blockifier):
@@ -68,19 +61,47 @@ class AssemblyAIBlockifier(Blockifier):
 
     config: AssemblyAIBlockifierConfig
 
+    SUPPORTED_MIME_TYPES = (
+        MimeTypes.MP3,
+        MimeTypes.WAV,
+        "video/mp4",
+        "audio/mp4",
+        "audio/webm",
+        "video/webm",
+    )
+
+    BASE_URL = "https://api.assemblyai.com/v2"
+    BASE_HEADERS = {
+        "content-type": "application/json",
+    }
+
     def config_cls(self) -> Type[Config]:
         """Return the Configuration class."""
         return AssemblyAIBlockifierConfig
 
-    def transcribe_audio_file(self, file_uri: str) -> Optional[Dict[str, Any]]:
-        """Transcribe an audio file stored on s3."""
-        # Transcribe audio file
-        headers = {
-            "authorization": self.config.assembly_ai_api_token,
-            "content-type": "application/json",
-        }
+    def run(
+        self, request: PluginRequest[RawDataPluginInput]
+    ) -> Union[Response, Response[BlockAndTagPluginOutput]]:
+        """Transcribe the audio file, store the transcription results in blocks and tags."""
+        logging.info("AssemblyAI S2T Blockifier received run request.")
+        if request.is_status_check:
+            logging.info("Status check.")
+
+            if "transcription_id" not in request.status.remote_status_input:
+                raise SteamshipError(message="Status check requests need to provide a valid job id")
+            return self._check_transcription_status(
+                request.status.remote_status_input["transcription_id"]
+            )
+        else:
+            mime_type = self._check_mime_type(request)
+            signed_url = self._upload_audio_file(mime_type, request.data.data)
+            transcription_id = self._start_transcription(file_uri=signed_url)
+            return self._check_transcription_status(transcription_id)
+
+    def _start_transcription(self, file_uri: str) -> str:
+        """Start to transcribe the audio file stored on s3 and return the transcription id."""
         response = requests.post(
-            f"{BASE_URL}/transcript",
+            f"{self.BASE_URL}/transcript",
             json={
                 "audio_url": file_uri,
                 "speaker_labels": self.config.speaker_detection,
@@ -91,225 +112,106 @@ class AssemblyAIBlockifier(Blockifier):
                 "auto_chapters": self.config.enable_audio_intelligence,
                 "entity_detection": self.config.enable_audio_intelligence,
             },
-            headers=headers,
+            headers={"authorization": ASSEMBLY_API_TOKEN, **self.BASE_HEADERS},
+        )
+        return response.json().get("id")
+
+    @staticmethod
+    def _process_transcription_response(transcription_response: Dict[str, Any]) -> Response:
+        tags = [
+            *parse_speaker_tags(transcription_response),
+            *parse_timestamps(transcription_response),
+            *parse_topics(transcription_response),
+            *parse_summary(transcription_response),
+            *parse_sentiments(transcription_response),
+            *parse_chapters(transcription_response),
+            *parse_entities(transcription_response),
+        ]
+
+        return Response(
+            data=BlockAndTagPluginOutput(
+                file=File.CreateRequest(
+                    blocks=[
+                        Block.CreateRequest(
+                            text=transcription_response["text"],
+                            tags=tags,
+                        )
+                    ]
+                )
+            )
         )
 
-        response_json = response.json()
-        transcript_id = response_json.get("id")
+    def _check_transcription_status(self, transcription_id: str) -> Response:
+        response = requests.get(
+            f"{self.BASE_URL}/transcript/{transcription_id}",
+            headers={"authorization": ASSEMBLY_API_TOKEN, **self.BASE_HEADERS},
+        )
+        transcription_response = response.json()
+        job_status = transcription_response["status"]
+        logging.info(f"Job {transcription_id} has status {job_status}.")
 
-        # Wait for results
-        max_tries = self.config.max_retries
-        while max_tries > 0:
-            max_tries -= 1
-
-            response = requests.get(f"{BASE_URL}/transcript/{transcript_id}", headers=headers)
-            response_json = response.json()
-            job_status = response_json["status"]
-
-            if response_json["status"] in {
-                TranscribeJobStatus.COMPLETED,
-                TranscribeJobStatus.ERROR,
-            }:
-                logging.info(f"Job {transcript_id} has status {job_status}.")
-                if job_status == TranscribeJobStatus.COMPLETED:
-                    return response_json
-                else:
-                    return None
+        if job_status in {
+            TranscribeJobStatus.COMPLETED,
+            TranscribeJobStatus.ERROR,
+        }:
+            if job_status == TranscribeJobStatus.COMPLETED:
+                return self._process_transcription_response(transcription_response)
             else:
-                logging.info(f"Waiting for {transcript_id}. Current status is {job_status}.")
-            time.sleep(self.config.retry_timeout)
-
-    def run(self, request: PluginRequest[RawDataPluginInput]) -> Response[BlockAndTagPluginOutput]:
-        """Blockify the saved JSON results of the Zendesk File Importer."""
-        session = boto3.Session(
-            aws_access_key_id=self.config.aws_access_key_id,
-            aws_secret_access_key=self.config.aws_secret_access_key,
-        )
-        mime_type = request.data.default_mime_type
-
-        if mime_type not in SUPPORTED_MIME_TYPES:
-            raise SteamshipError(
-                "Unsupported mimeType. "
-                f"Currently, the following mimeTypes are supported: {SUPPORTED_MIME_TYPES}"
+                raise SteamshipError(
+                    message="Transcription was unsuccessful. "
+                    "Please check Assembly AI for error message."
+                )
+        else:
+            return Response(
+                status=Task(
+                    state=TaskState.running,
+                    remote_status_message="Transcription job ongoing.",
+                    remote_status_input={"transcription_id": transcription_id},
+                )
             )
 
-        # Upload audio stream to s3
-        data = io.BytesIO(request.data.data)
-        s3_client = session.client("s3")
+    def _upload_audio_file(self, mime_type: str, data: bytes) -> str:
         media_format = mime_type.split("/")[1]
         unique_file_id = f"{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}-{uuid4()}.{media_format}"
-        s3_client.upload_fileobj(data, self.config.aws_s3_bucket_name, unique_file_id)
-
-        # Generate presigned url
-        signed_url = s3_client.generate_presigned_url(
-            ClientMethod="get_object",
-            Params={"Bucket": self.config.aws_s3_bucket_name, "Key": unique_file_id},
-            ExpiresIn=3600,
+        s3_client = (
+            Steamship(profile="staging")
+            if "docker" in str(self.client.config.api_base)
+            else self.client
         )
 
-        # Start Assembly AI Transcription
-        transcription_response = self.transcribe_audio_file(file_uri=signed_url)
-
-        if transcription_response:
-            tags = []
-            utterance_index = 0
-            if self.config.speaker_detection:
-                utterances = transcription_response["utterances"]
-                for utterance in utterances:
-                    utterance_length = len(utterance["text"])
-                    tags.append(
-                        Tag.CreateRequest(
-                            kind="speaker",
-                            start_idx=utterance_index,
-                            end_idx=utterance_index + utterance_length,
-                            name=utterance["speaker"],
-                        )
-                    )
-                    utterance_index += utterance_length + 1
-
-                    word_index = 0
-
-                    for word in utterance["words"]:
-                        word_length = len(word["text"])
-                        tags.append(
-                            Tag.CreateRequest(
-                                kind="timestamp",
-                                start_idx=word_index,
-                                end_idx=word_index + word_length,
-                                name=utterance["speaker"],
-                            )
-                        )
-                        word_index += word_length + 1
-
-            # Parse topics
-            tags.extend(self._parse_topics(transcription_response))
-
-            tags.extend(self._parse_summary(transcription_response))
-
-            tags.extend(self._parse_sentiments(transcription_response))
-
-            tags.extend(self._parse_chapters(transcription_response))
-
-            tags.extend(self._parse_entities(transcription_response))
-
-            return Response(
-                data=BlockAndTagPluginOutput(
-                    file=File.CreateRequest(
-                        blocks=[
-                            Block.CreateRequest(
-                                text=transcription_response["text"],
-                                tags=tags,
-                            )
-                        ]
-                    )
+        writing_signed_url = (
+            s3_client.get_space()
+            .create_signed_url(
+                SignedUrl.Request(
+                    bucket=SignedUrl.Bucket.PLUGIN_DATA,
+                    filepath=unique_file_id,
+                    operation=SignedUrl.Operation.WRITE,
                 )
             )
-        else:
+            .data.signed_url
+        )
+        upload_to_signed_url(writing_signed_url, data)
+
+        return (
+            s3_client.get_space()
+            .create_signed_url(
+                SignedUrl.Request(
+                    bucket=SignedUrl.Bucket.PLUGIN_DATA,
+                    filepath=unique_file_id,
+                    operation=SignedUrl.Operation.READ,
+                )
+            )
+            .data.signed_url
+        )
+
+    def _check_mime_type(self, request: PluginRequest) -> str:
+        mime_type = request.data.default_mime_type
+        if mime_type not in self.SUPPORTED_MIME_TYPES:
             raise SteamshipError(
-                message="Transcription of file was unsuccessful. "
-                "Please check Amazon Transcribe for error message."
+                "Unsupported mimeType. "
+                f"The following mimeTypes are supported: {self.SUPPORTED_MIME_TYPES}"
             )
-
-    @staticmethod
-    def _parse_entities(transcription_response):
-        tags = []
-        if "entities" in transcription_response:
-            entities = transcription_response["entities"]
-            for entity in entities:
-                tags.append(
-                    Tag.CreateRequest(
-                        kind="entities",
-                        name=entity["entity_type"],
-                        value={"value": entity["text"]},
-                        start_idx=None,  # TODO
-                        end_idx=None,  # TODO
-                    )
-                )
-        return tags
-
-    @staticmethod
-    def _parse_chapters(transcription_response):
-        tags = []
-        if "chapters" in transcription_response:
-            chapters = transcription_response["chapters"]
-            for chapter in chapters:
-                tags.append(
-                    Tag.CreateRequest(
-                        kind="chapter",
-                        value={
-                            "summary": chapter["summary"],
-                            "headline": chapter["headline"],
-                            "gist": chapter["gist"],
-                            "start_time": chapter["start"],
-                            "end_time": chapter["end"],
-                        },
-                        start_idx=None,  # TODO
-                        end_idx=None,  # TODO
-                    )
-                )
-        return tags
-
-    @staticmethod
-    def _parse_sentiments(transcription_response):
-        tags = []
-        if "sentiment_analysis_results" in transcription_response:
-            sentiment_analysis_results = transcription_response["sentiment_analysis_results"]
-            ix = 0
-            for sentiment in sentiment_analysis_results:
-                span_text = sentiment["text"]
-                tags.append(
-                    Tag.CreateRequest(
-                        kind="sentiments",
-                        name=sentiment["sentiment"],
-                        value={"span_text": span_text, "confidence": sentiment["confidence"]},
-                        start_idx=ix,
-                        end_idx=ix + len(span_text),
-                    )
-                )
-                ix += len(span_text) + 1
-        return tags
-
-    @staticmethod
-    def _parse_summary(transcription_response):
-        tags = []
-        if "summary" in transcription_response.get("iab_categories_result", {}):
-            summary = transcription_response["iab_categories_result"]["summary"]
-            for topic, relevance in summary.items():
-                tags.append(
-                    Tag.CreateRequest(
-                        kind="topic_summary",
-                        name=topic,
-                        value={"relevance": relevance},
-                        end_idx=None,
-                        start_idx=None,
-                    )
-                )
-        return tags
-
-    @staticmethod
-    def _parse_topics(transcription_response):
-        tags = []
-        if "results" in transcription_response.get("iab_categories_result", {}):
-            topics = transcription_response["iab_categories_result"]["results"]
-            ix = 0
-            for topic_fragment in topics:
-                topic_length = len(topic_fragment["text"])
-                for label in topic_fragment["labels"]:
-                    tags.append(
-                        Tag.CreateRequest(
-                            kind="topic",
-                            name=label["label"],
-                            value={
-                                "span_text": topic_fragment["text"],
-                                "relevance": label["relevance"],
-                            },
-                            start_idx=ix,
-                            end_idx=ix + topic_length,
-                        )
-                    )
-                ix += topic_length + 1
-
-        return tags
+        return mime_type
 
 
 handler = create_handler(AssemblyAIBlockifier)

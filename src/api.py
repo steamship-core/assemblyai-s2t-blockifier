@@ -80,7 +80,7 @@ class AssemblyAIBlockifier(Blockifier):
         return AssemblyAIBlockifierConfig
 
     def run(
-        self, request: PluginRequest[RawDataPluginInput]
+            self, request: PluginRequest[RawDataPluginInput]
     ) -> Union[Response, Response[BlockAndTagPluginOutput]]:
         """Transcribe the audio file, store the transcription results in blocks and tags."""
         logging.info("AssemblyAI S2T Blockifier received run request.")
@@ -116,8 +116,7 @@ class AssemblyAIBlockifier(Blockifier):
         )
         return response.json().get("id")
 
-    @staticmethod
-    def _process_transcription_response(transcription_response: Dict[str, Any]) -> Response:
+    def _process_transcription_response(self, transcription_response: Dict[str, Any]) -> Response:
         tags = [
             *parse_speaker_tags(transcription_response),
             *parse_timestamps(transcription_response),
@@ -159,7 +158,7 @@ class AssemblyAIBlockifier(Blockifier):
             else:
                 raise SteamshipError(
                     message="Transcription was unsuccessful. "
-                    "Please check Assembly AI for error message."
+                            "Please check Assembly AI for error message."
                 )
         else:
             return Response(

@@ -50,8 +50,8 @@ def parse_entities(transcription_response):
                     kind="entities",
                     name=entity["entity_type"],
                     value={"value": entity["text"]},
-                    start_idx=None,  # TODO
-                    end_idx=None,  # TODO
+                    start_idx=entity["start"],
+                    end_idx=entity["end"],
                 )
             )
     return tags
@@ -73,8 +73,8 @@ def parse_chapters(transcription_response):
                         "start_time": chapter["start"],
                         "end_time": chapter["end"],
                     },
-                    start_idx=None,  # TODO
-                    end_idx=None,  # TODO
+                    start_idx=chapter["start"],
+                    end_idx=chapter["end"],
                 )
             )
     return tags

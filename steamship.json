@@ -6,7 +6,7 @@
   "description": "Blockifies audio via Assembly AI",
   "public": true,
   "type": "plugin",
-  "version": "0.0.26",
+  "version": "0.0.29",
   "plugin": {
     "isTrainable": false,
     "transport": "jsonOverHttp",

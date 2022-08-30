@@ -1,12 +1,11 @@
 {
-  "author": "",
-  "entrypoint": "src.api.handler",
-  "handle": "assemblyai-s2t-blockifier",
-  "name": "assemblyai-s2t-blockifier",
-  "description": "Blockifies audio via Assembly AI",
+  "author": "Steamship",
+  "entrypoint": "api.handler",
+  "handle": "audio-to-text-blockifier-default",
+  "description": "Converts audio into Steamship's standard block format via Assembly AI",
   "public": true,
   "type": "plugin",
-  "version": "0.0.29",
+  "version": "1.0.0",
   "plugin": {
     "isTrainable": false,
     "transport": "jsonOverHttp",

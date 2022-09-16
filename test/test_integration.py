@@ -1,4 +1,4 @@
-"""Test zendesk-blockifier via integration tests."""
+"""Test assemblyai-s2t-blockifier via integration tests."""
 
 from test import TEST_DATA
 from test.utils import load_config, verify_file
@@ -7,9 +7,8 @@ from typing import Any, Dict
 import pytest
 from steamship import File, PluginInstance, Steamship
 from steamship.base.mime_types import MimeTypes
-from steamship.data import Plugin
 
-BLOCKIFIER_HANDLE = "assemblyai-s2t-blockifier"
+BLOCKIFIER_HANDLE = "s2t-blockifier-default"
 ENVIRONMENT = "staging"
 
 
@@ -33,8 +32,8 @@ def test_blockifier(speaker_detection):
     file = File.create(client, filename=str(audio_path.resolve()), mime_type=MimeTypes.MP3).data
 
     blockify_response = file.blockify(plugin_instance=blockifier.handle)
-    blockify_response.wait(max_timeout_s=3600, retry_delay_s=5)
+    blockify_response.wait(max_timeout_s=3600, retry_delay_s=0.1)
 
     file = file.refresh().data
 
-    verify_file(file, speaker_detection)
+    verify_file(file)

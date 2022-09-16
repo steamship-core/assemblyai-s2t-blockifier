@@ -1,2 +1,3 @@
 git+https://github.com/nludb/python-client
 boto3
+toml

@@ -15,6 +15,7 @@ def parse_speaker_tags(transcription_response):
                     start_idx=utterance_index,
                     end_idx=utterance_index + utterance_length,
                     name=utterance["speaker"],
+                    value={"start_time": utterance["start"], "end_time": utterance["end"]},
                 )
             )
             utterance_index += utterance_length + 1
@@ -23,41 +24,48 @@ def parse_speaker_tags(transcription_response):
 
 def parse_timestamps(transcription_response):
     """Extract timestamp tags from transcription response."""
+    time_idx_to_char_idx = {}
     tags = []
-    word_index = 0
+    char_idx = 0
     for word in transcription_response["words"]:
         word_length = len(word["text"])
         tags.append(
             Tag.CreateRequest(
                 kind="timestamp",
-                start_idx=word_index,
-                end_idx=word_index + word_length,
+                start_idx=char_idx,
+                end_idx=char_idx + word_length,
                 name=word["text"],
                 value={"start_time": word["start"], "end_time": word["end"]},
             )
         )
-        word_index += word_length + 1
-    return tags
+        time_idx_to_char_idx[word["start"]] = char_idx
+        time_idx_to_char_idx[word["end"]] = char_idx + word_length
+        char_idx += word_length + 1
+    return tags, time_idx_to_char_idx
 
 
-def parse_entities(transcription_response):
+def parse_entities(transcription_response, time_idx_to_char_idx):
     """Extract entity tags from transcription response."""
     tags = []
     if "entities" in transcription_response:
         for entity in transcription_response["entities"]:
             tags.append(
                 Tag.CreateRequest(
-                    kind="entities",
-                    name=entity["entity_type"],
-                    value={"value": entity["text"]},
-                    start_idx=entity["start"],
-                    end_idx=entity["end"],
+                    kind="entity",
+                    name=entity["text"],
+                    value={
+                        "type": entity["entity_type"],
+                        "start_time": entity["start"],
+                        "end_time": entity["end"],
+                    },
+                    start_idx=time_idx_to_char_idx[entity["start"]],
+                    end_idx=time_idx_to_char_idx[entity["end"]],
                 )
             )
     return tags
 
 
-def parse_chapters(transcription_response):
+def parse_chapters(transcription_response, time_idx_to_char_idx):
     """Extract chapters and corresponding summaries from transcription response."""
     tags = []
     if "chapters" in transcription_response:
@@ -73,8 +81,8 @@ def parse_chapters(transcription_response):
                         "start_time": chapter["start"],
                         "end_time": chapter["end"],
                     },
-                    start_idx=chapter["start"],
-                    end_idx=chapter["end"],
+                    start_idx=time_idx_to_char_idx[chapter["start"]],
+                    end_idx=time_idx_to_char_idx[chapter["end"]],
                 )
             )
     return tags
@@ -84,23 +92,27 @@ def parse_sentiments(transcription_response):
     """Extract sentiment tags from transcription response."""
     tags = []
     if "sentiment_analysis_results" in transcription_response:
-        ix = 0
+        char_idx = 0
         for sentiment in transcription_response["sentiment_analysis_results"]:
             span_text = sentiment["text"]
             tags.append(
                 Tag.CreateRequest(
-                    kind="sentiments",
+                    kind="sentiment",
                     name=sentiment["sentiment"],
-                    value={"span_text": span_text, "confidence": sentiment["confidence"]},
-                    start_idx=ix,
-                    end_idx=ix + len(span_text),
+                    value={
+                        "confidence": sentiment["confidence"],
+                        "start_time": sentiment["start"],
+                        "end_time": sentiment["end"],
+                    },
+                    start_idx=char_idx,
+                    end_idx=char_idx + len(span_text),
                 )
             )
-            ix += len(span_text) + 1
+            char_idx += len(span_text) + 1
     return tags
 
 
-def parse_summary(transcription_response):
+def parse_topic_summaries(transcription_response):
     """Extract summary from transcription response."""
     tags = []
     if "summary" in transcription_response.get("iab_categories_result", {}):
@@ -110,7 +122,11 @@ def parse_summary(transcription_response):
                 Tag.CreateRequest(
                     kind="topic_summary",
                     name=topic,
-                    value={"relevance": relevance},
+                    value={
+                        "relevance": relevance,
+                        "start_time": None,
+                        "end_time": None,
+                    },
                     end_idx=None,
                     start_idx=None,
                 )
@@ -122,22 +138,24 @@ def parse_topics(transcription_response):
     """Extract topic tags from transcription response."""
     tags = []
     if "results" in transcription_response.get("iab_categories_result", {}):
-        ix = 0
+        char_idx = 0
         for topic_fragment in transcription_response["iab_categories_result"]["results"]:
             topic_length = len(topic_fragment["text"])
+            start_time = topic_fragment["timestamp"]["start"]
+            end_time = topic_fragment["timestamp"]["end"]
             for label in topic_fragment["labels"]:
                 tags.append(
                     Tag.CreateRequest(
                         kind="topic",
                         name=label["label"],
                         value={
-                            "span_text": topic_fragment["text"],
                             "relevance": label["relevance"],
+                            "start_time": start_time,
+                            "end_time": end_time,
                         },
-                        start_idx=ix,
-                        end_idx=ix + topic_length,
+                        start_idx=char_idx,
+                        end_idx=char_idx + topic_length,
                     )
                 )
-            ix += topic_length + 1
-
+            char_idx += topic_length + 1
     return tags

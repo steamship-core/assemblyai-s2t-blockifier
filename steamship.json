@@ -1,12 +1,12 @@
 {
   "author": "",
   "entrypoint": "src.api.handler",
-  "handle": "assemblyai-s2t-blockifier",
-  "name": "assemblyai-s2t-blockifier",
+  "handle": "s2t-blockifier-default",
+  "name": "s2t-blockifier-default",
   "description": "Blockifies audio via Assembly AI",
   "public": true,
   "type": "plugin",
-  "version": "0.0.29",
+  "version": "0.1.4",
   "plugin": {
     "isTrainable": false,
     "transport": "jsonOverHttp",

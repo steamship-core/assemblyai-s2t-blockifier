@@ -5,12 +5,14 @@ A JSON file containing a list of tickets (produced by the zendesk-file-importer)
  fields reference in the config.
 """
 import logging
+import pathlib
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, Type, Union
 from uuid import uuid4
 
 import requests
+import toml
 from steamship import Block, File, Steamship, SteamshipError
 from steamship.app import Response, create_handler
 from steamship.base import Task, TaskState
@@ -28,8 +30,8 @@ from parsers import (
     parse_entities,
     parse_sentiments,
     parse_speaker_tags,
-    parse_summary,
     parse_timestamps,
+    parse_topic_summaries,
     parse_topics,
 )
 
@@ -37,6 +39,7 @@ from parsers import (
 class AssemblyAIBlockifierConfig(Config):
     """Config object containing required configuration parameters to initialize a AssemblyAIBlockifier."""
 
+    assembly_api_token: str
     speaker_detection: bool = True
     enable_audio_intelligence: bool = True
 
@@ -75,12 +78,22 @@ class AssemblyAIBlockifier(Blockifier):
         "content-type": "application/json",
     }
 
+    def __init__(self, **kwargs):
+        secret_kwargs = toml.load(
+            str(pathlib.Path(__file__).parent / ".steamship" / "secrets.toml")
+        )
+        kwargs["config"] = {
+            **secret_kwargs,
+            **{k: v for k, v in kwargs["config"].items() if v != ""},
+        }
+        super().__init__(**kwargs)
+
     def config_cls(self) -> Type[Config]:
         """Return the Configuration class."""
         return AssemblyAIBlockifierConfig
 
     def run(
-            self, request: PluginRequest[RawDataPluginInput]
+        self, request: PluginRequest[RawDataPluginInput]
     ) -> Union[Response, Response[BlockAndTagPluginOutput]]:
         """Transcribe the audio file, store the transcription results in blocks and tags."""
         logging.info("AssemblyAI S2T Blockifier received run request.")
@@ -112,19 +125,21 @@ class AssemblyAIBlockifier(Blockifier):
                 "auto_chapters": self.config.enable_audio_intelligence,
                 "entity_detection": self.config.enable_audio_intelligence,
             },
-            headers={"authorization": ASSEMBLY_API_TOKEN, **self.BASE_HEADERS},
+            headers={"authorization": self.config.assembly_api_token, **self.BASE_HEADERS},
         )
         return response.json().get("id")
 
     def _process_transcription_response(self, transcription_response: Dict[str, Any]) -> Response:
+        timestamp_tags, time_idx_to_char_idx = parse_timestamps(transcription_response)
+
         tags = [
+            *timestamp_tags,
             *parse_speaker_tags(transcription_response),
-            *parse_timestamps(transcription_response),
             *parse_topics(transcription_response),
-            *parse_summary(transcription_response),
+            *parse_topic_summaries(transcription_response),
             *parse_sentiments(transcription_response),
-            *parse_chapters(transcription_response),
-            *parse_entities(transcription_response),
+            *parse_chapters(transcription_response, time_idx_to_char_idx),
+            *parse_entities(transcription_response, time_idx_to_char_idx),
         ]
 
         return Response(
@@ -158,7 +173,7 @@ class AssemblyAIBlockifier(Blockifier):
             else:
                 raise SteamshipError(
                     message="Transcription was unsuccessful. "
-                            "Please check Assembly AI for error message."
+                    "Please check Assembly AI for error message."
                 )
         else:
             return Response(

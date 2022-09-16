@@ -1,4 +1,4 @@
-"""Test zendesk-blockifier via unit tests."""
+"""Test assemblyai-s2t-blockifier via unit tests."""
 from test import TEST_DATA
 from test.utils import load_config, verify_response
 
@@ -10,7 +10,7 @@ from steamship.plugin.service import PluginRequest
 
 from src.api import AssemblyAIBlockifier
 
-ENVIRONMENT = "test"
+ENVIRONMENT = "staging"
 
 
 def _read_test_audio_file(filename: str) -> str:
@@ -19,7 +19,7 @@ def _read_test_audio_file(filename: str) -> str:
 
 
 @pytest.mark.parametrize("speaker_detection", (True, False))
-def test_blockifier(speaker_detection):
+def test_blockifier(speaker_detection: bool):
     """Test Amazon Transcribe (S2T) Blockifier without edge cases."""
     config = load_config()
     client = Steamship(profile=ENVIRONMENT)
@@ -42,4 +42,4 @@ def test_blockifier(speaker_detection):
         )
         response = blockifier.run(request)
 
-    verify_response(response, speaker_detection)
+    verify_response(response)

@@ -5,14 +5,12 @@ A JSON file containing a list of tickets (produced by the zendesk-file-importer)
  fields reference in the config.
 """
 import logging
-import pathlib
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, Type, Union
 from uuid import uuid4
 
 import requests
-import toml
 from steamship import Block, File, Steamship, SteamshipError
 from steamship.app import Response, create_handler
 from steamship.base import Task, TaskState
@@ -24,7 +22,6 @@ from steamship.plugin.outputs.block_and_tag_plugin_output import BlockAndTagPlug
 from steamship.plugin.service import PluginRequest
 from steamship.utils.signed_urls import upload_to_signed_url
 
-from keys import ASSEMBLY_API_TOKEN
 from parsers import (
     parse_chapters,
     parse_entities,
@@ -77,16 +74,6 @@ class AssemblyAIBlockifier(Blockifier):
     BASE_HEADERS = {
         "content-type": "application/json",
     }
-
-    def __init__(self, **kwargs):
-        secret_kwargs = toml.load(
-            str(pathlib.Path(__file__).parent / ".steamship" / "secrets.toml")
-        )
-        kwargs["config"] = {
-            **secret_kwargs,
-            **{k: v for k, v in kwargs["config"].items() if v != ""},
-        }
-        super().__init__(**kwargs)
 
     def config_cls(self) -> Type[Config]:
         """Return the Configuration class."""
@@ -158,7 +145,7 @@ class AssemblyAIBlockifier(Blockifier):
     def _check_transcription_status(self, transcription_id: str) -> Response:
         response = requests.get(
             f"{self.BASE_URL}/transcript/{transcription_id}",
-            headers={"authorization": ASSEMBLY_API_TOKEN, **self.BASE_HEADERS},
+            headers={"authorization": self.config.assembly_api_token, **self.BASE_HEADERS},
         )
         transcription_response = response.json()
         job_status = transcription_response["status"]

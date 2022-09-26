@@ -123,7 +123,7 @@ def parse_topic_summaries(transcription_response):
                     kind="topic_summary",
                     name=topic,
                     value={
-                        "relevance": relevance,
+                        "confidence": relevance,
                         "start_time": None,
                         "end_time": None,
                     },
@@ -149,7 +149,7 @@ def parse_topics(transcription_response):
                         kind="topic",
                         name=label["label"],
                         value={
-                            "relevance": label["relevance"],
+                            "confidence": label["relevance"],
                             "start_time": start_time,
                             "end_time": end_time,
                         },

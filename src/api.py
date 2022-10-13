@@ -1,8 +1,6 @@
-"""Zendesk ticket blockifier.
+"""AssemblyAI speech-to-text blockifier.
 
-A JSON file containing a list of tickets (produced by the zendesk-file-importer) is loaded
- and parsed into a list of blocks. Each block contains one or more tags extracted from the
- fields reference in the config.
+An audio file is loaded and converted into blocks, with tags added according to the plugin configuration.
 """
 import logging
 import pathlib

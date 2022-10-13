@@ -23,7 +23,7 @@ def _get_plugin_instance(client: Steamship, handle: str, config: Dict[str, Any])
 
 @pytest.mark.parametrize("speaker_detection", (True, False))
 def test_blockifier(speaker_detection):
-    """Test the Zendesk File Importer via an integration test."""
+    """Test the AssemblyAI Blockifier via an integration test."""
     client = Steamship(profile=ENVIRONMENT)
     config = load_config()
     config["speaker_detection"] = speaker_detection

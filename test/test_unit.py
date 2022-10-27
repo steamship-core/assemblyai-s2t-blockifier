@@ -1,6 +1,4 @@
 """Test assemblyai-s2t-blockifier via unit tests."""
-from steamship.plugin.request import PluginRequest
-
 from test import TEST_DATA
 from test.utils import load_config, verify_response
 
@@ -8,6 +6,7 @@ import pytest as pytest
 from steamship import Steamship
 from steamship.base import TaskState
 from steamship.plugin.inputs.raw_data_plugin_input import RawDataPluginInput
+from steamship.plugin.request import PluginRequest
 
 from src.api import AssemblyAIBlockifier
 

@@ -1,22 +1,24 @@
 """Test assemblyai-s2t-blockifier via integration tests."""
+from test import TEST_DATA
+from test.utils import load_config, verify_file
+
 import pytest
 from steamship import File, PluginInstance, Steamship, Task, TaskState
 from steamship.base.mime_types import MimeTypes
 
-from test import TEST_DATA
-from test.utils import load_config, verify_file
-
 BLOCKIFIER_HANDLE = "s2t-blockifier-default"
-ENVIRONMENT = "test"
+ENVIRONMENT = "prod"
 
 
 @pytest.fixture
 def steamship() -> Steamship:
+    """Instantiate a Steamship client."""
     return Steamship(profile=ENVIRONMENT)
 
 
 @pytest.fixture
 def plugin_instance(steamship: Steamship) -> PluginInstance:
+    """Instantiate a plugin instance."""
     plugin_instance = steamship.use_plugin(plugin_handle=BLOCKIFIER_HANDLE, config=load_config())
     assert plugin_instance is not None
     assert plugin_instance.id is not None

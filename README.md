@@ -29,6 +29,7 @@ And then login with:
 
 ```python
 from steamship import Steamship, File, MimeTypes
+from pathlib import Path
 
 PLUGIN_HANDLE = "assemblyai-s2t-blockifier"
 PLUGIN_CONFIG = {
@@ -37,9 +38,9 @@ PLUGIN_CONFIG = {
 }
 
 ship = Steamship()  # Without arguments, credentials in ~/.steamship.json will be used.
-audio_path = "FILL_IN"
+audio_path = Path("FILL_IN")
 s2t_plugin_instance = ship.use_plugin(plugin_handle=PLUGIN_HANDLE)
-file = File.create(ship, filename=audio_path, mime_type=MimeTypes.MP3)
+file = File.create(ship, content=audio_path.open("b").read(), mime_type=MimeTypes.MP3)
 tag_results = file.tag(plugin_instance=s2t_plugin_instance.handle)
 tag_results.wait()
 

@@ -1,5 +1,4 @@
 """Test assemblyai-s2t-blockifier via integration tests."""
-
 from test import TEST_DATA
 from test.utils import load_config, verify_file
 from typing import Any, Dict

@@ -1,3 +1,3 @@
-git+https://github.com/nludb/python-client
+git+https://github.com/nludb/python-client@ec/support-steamship-secrets
 boto3
 toml

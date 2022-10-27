@@ -2,11 +2,10 @@
   "author": "",
   "entrypoint": "src.api.handler",
   "handle": "s2t-blockifier-default",
-  "name": "s2t-blockifier-default",
   "description": "Blockifies audio via Assembly AI",
   "public": true,
   "type": "plugin",
-  "version": "0.1.8",
+  "version": "2.2.0",
   "plugin": {
     "isTrainable": false,
     "transport": "jsonOverHttp",
@@ -23,5 +22,28 @@
       "description": "Enable audio intelligence.",
       "default": true
     }
+  },
+  "steamshipRegistry": {
+    "tagline": "Transcribe and tag audio via AssemblyAI.",
+    "tagline2": "Just load your raw audio file into Steamship and apply AssemblyAI to transcribe and tag it..",
+    "usefulFor": "Useful for transcribing audio and then searching its content using language AI features.",
+    "videoUrl": null,
+    "githubUrl": "https://github.com/steamship-plugins/assemblyai-s2t-blockifier",
+    "demoUrl": null,
+    "blogUrl": null,
+    "jupyterUrl": null,
+    "authorName": "Steamship",
+    "authorEmail": "hello@steamship.com",
+    "authorTwitter": "@GetSteamship",
+    "authorUrl": "https://www.steamship.com/",
+    "tags": [
+      "NLP",
+      "Transcription",
+      "Speaker Diarisation",
+      "Summarization",
+      "NER",
+      "Sentiment Analysis",
+      "Intent Classification"
+    ]
   }
 }

@@ -8,8 +8,8 @@ This plugin must be configured with the following fields:
 
 | Parameter | Description | DType | Required |
 |-------------------|----------------------------------------------------|--------|--|
-| speaker_detection | Enable speaker detection | bool |True|
-| enable_audio_intelligence | Enable Audio Intelligence (note that this incurs a higher cost) | True |
+| speaker_detection | Enable speaker detection | bool | False |
+| enable_audio_intelligence | Enable Audio Intelligence (note that this incurs a higher cost) | False |
 
 ## Getting Started
 
@@ -28,7 +28,7 @@ And then login with:
 ```
 
 ```python
-from steamship import Steamship, PluginInstance, File, MimeTypes
+from steamship import Steamship, File, MimeTypes
 
 PLUGIN_HANDLE = "assemblyai-s2t-blockifier"
 PLUGIN_CONFIG = {
@@ -36,16 +36,14 @@ PLUGIN_CONFIG = {
     "enable_audio_intelligence": True
 }
 
-client = Steamship(profile="staging")  # Without arguments, credentials in ~/.steamship.json will be used.
-s2t_plugin_instance = PluginInstance.create(
-    client, plugin_handle=PLUGIN_HANDLE, config=PLUGIN_CONFIG
-).data
+ship = Steamship()  # Without arguments, credentials in ~/.steamship.json will be used.
 audio_path = "FILL_IN"
-file = File.create(client, filename=str(audio_path.resolve()), mime_type=MimeTypes.MP3).data
+s2t_plugin_instance = ship.use_plugin(plugin_handle=PLUGIN_HANDLE)
+file = File.create(ship, filename=audio_path, mime_type=MimeTypes.MP3)
 tag_results = file.tag(plugin_instance=s2t_plugin_instance.handle)
 tag_results.wait()
 
-file = file.refresh().data
+file = tag_results.output.file
 for block in file.blocks:
     print(block.text)
 ```

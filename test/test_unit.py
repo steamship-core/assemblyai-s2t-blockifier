@@ -20,7 +20,7 @@ def _read_test_audio_file(filename: str) -> str:
 
 @pytest.mark.parametrize("speaker_detection", (True, False))
 def test_blockifier(speaker_detection: bool):
-    """Test Amazon Transcribe (S2T) Blockifier without edge cases."""
+    """Test AssemblyAI (S2T) Blockifier without edge cases."""
     config = load_config()
     client = Steamship(profile=ENVIRONMENT)
     config["speaker_detection"] = speaker_detection

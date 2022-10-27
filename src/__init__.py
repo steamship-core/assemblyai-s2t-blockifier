@@ -1,1 +1,1 @@
-"""Blockifier for Zendesk tickets."""
+"""Blockifier for audio files using AssemblyAI speech-to-text transcription."""

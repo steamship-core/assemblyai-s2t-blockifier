@@ -1,4 +1,4 @@
-# Amazon Transcribe blockifier
+# AssemblyAI Transcribe blockifier
 
 This project contains a Steamship Blockifier that transcribes and analyzes audio files via AssemblyAI.
 

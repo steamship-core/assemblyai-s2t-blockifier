@@ -7,7 +7,7 @@ from steamship import File, PluginInstance, Steamship, Task, TaskState
 from steamship.base.mime_types import MimeTypes
 
 BLOCKIFIER_HANDLE = "s2t-blockifier-default"
-ENVIRONMENT = "prod"
+ENVIRONMENT = "staging"
 
 
 @pytest.fixture

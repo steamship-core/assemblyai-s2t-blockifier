@@ -18,6 +18,10 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@v2
+      - name: Open Web Client Directory
+        working-directory: test/data
+        run: |
+          ls -la
       - name: Setup secrets file
         shell: bash
         env:
@@ -27,7 +31,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v2
         with:
-          python-version: "3.x"
+          python-version: "3.10"
       - name: Install Virtualenv
         run: |
           python3 -m venv .venv

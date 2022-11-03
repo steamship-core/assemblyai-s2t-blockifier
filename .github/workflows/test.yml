@@ -50,3 +50,4 @@ jobs:
         env:
           STEAMSHIP_API_KEY: ${{ secrets.STEAMSHIP_API_KEY }}
           STEAMSHIP_API_KEY_STAGING: ${{ secrets.STEAMSHIP_API_KEY_STAGING }}
+          STEAMSHIP_API_BASE_STAGING: ${{ secrets.STEAMSHIP_API_BASE_STAGING }}

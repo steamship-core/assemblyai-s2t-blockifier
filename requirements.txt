@@ -1,1 +1,1 @@
-git+https://github.com/nludb/python-client@ec/fix-config-env-loading
+steamship===2.2.0b2

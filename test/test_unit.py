@@ -6,7 +6,7 @@ import pytest as pytest
 from steamship import Steamship
 from steamship.base import TaskState
 from steamship.plugin.inputs.raw_data_plugin_input import RawDataPluginInput
-from steamship.plugin.service import PluginRequest
+from steamship.plugin.request import PluginRequest
 
 from src.api import AssemblyAIBlockifier
 

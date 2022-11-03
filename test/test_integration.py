@@ -1,38 +1,40 @@
 """Test assemblyai-s2t-blockifier via integration tests."""
 from test import TEST_DATA
 from test.utils import load_config, verify_file
-from typing import Any, Dict
 
 import pytest
-from steamship import File, PluginInstance, Steamship
+from steamship import File, PluginInstance, Steamship, Task, TaskState
 from steamship.base.mime_types import MimeTypes
 
 BLOCKIFIER_HANDLE = "s2t-blockifier-default"
 ENVIRONMENT = "staging"
 
 
-def _get_plugin_instance(client: Steamship, handle: str, config: Dict[str, Any]) -> PluginInstance:
-    plugin_instance = PluginInstance.create(
-        client, plugin_handle=handle, upsert=True, config=config
-    ).data
+@pytest.fixture
+def steamship() -> Steamship:
+    """Instantiate a Steamship client."""
+    return Steamship(profile=ENVIRONMENT)
+
+
+@pytest.fixture
+def plugin_instance(steamship: Steamship) -> PluginInstance:
+    """Instantiate a plugin instance."""
+    plugin_instance = steamship.use_plugin(plugin_handle=BLOCKIFIER_HANDLE, config=load_config())
     assert plugin_instance is not None
     assert plugin_instance.id is not None
     return plugin_instance
 
 
-@pytest.mark.parametrize("speaker_detection", (True, False))
-def test_blockifier(speaker_detection):
+def test_blockifier(steamship: Steamship, plugin_instance: PluginInstance):
     """Test the AssemblyAI Blockifier via an integration test."""
-    client = Steamship(profile=ENVIRONMENT)
-    config = load_config()
-    config["speaker_detection"] = speaker_detection
-    blockifier = _get_plugin_instance(client=client, handle=BLOCKIFIER_HANDLE, config=config)
     audio_path = TEST_DATA / "test_conversation.mp3"
-    file = File.create(client, filename=str(audio_path.resolve()), mime_type=MimeTypes.MP3).data
+    file = File.create(steamship, content=audio_path.open("rb").read(), mime_type=MimeTypes.MP3)
 
-    blockify_response = file.blockify(plugin_instance=blockifier.handle)
-    blockify_response.wait(max_timeout_s=3600, retry_delay_s=0.1)
+    blockify_task = file.blockify(plugin_instance=plugin_instance.handle)
+    blockify_task.wait(max_timeout_s=3600, retry_delay_s=1)
 
-    file = file.refresh().data
+    assert isinstance(blockify_task, Task)
+    assert blockify_task.state == TaskState.succeeded
+    file = blockify_task.output.file
 
     verify_file(file)

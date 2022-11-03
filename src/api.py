@@ -10,14 +10,14 @@ from uuid import uuid4
 
 import requests
 from steamship import Block, File, Steamship, SteamshipError
-from steamship.app import Response, create_handler
 from steamship.base import Task, TaskState
 from steamship.base.mime_types import MimeTypes
-from steamship.data.space import SignedUrl
-from steamship.plugin.blockifier import Blockifier, Config
+from steamship.data.workspace import SignedUrl, Workspace
+from steamship.invocable import Config, InvocableResponse, create_handler
+from steamship.plugin.blockifier import Blockifier
 from steamship.plugin.inputs.raw_data_plugin_input import RawDataPluginInput
 from steamship.plugin.outputs.block_and_tag_plugin_output import BlockAndTagPluginOutput
-from steamship.plugin.service import PluginRequest
+from steamship.plugin.request import PluginRequest
 from steamship.utils.signed_urls import upload_to_signed_url
 
 from parsers import (
@@ -79,7 +79,7 @@ class AssemblyAIBlockifier(Blockifier):
 
     def run(
         self, request: PluginRequest[RawDataPluginInput]
-    ) -> Union[Response, Response[BlockAndTagPluginOutput]]:
+    ) -> Union[InvocableResponse, InvocableResponse[BlockAndTagPluginOutput]]:
         """Transcribe the audio file, store the transcription results in blocks and tags."""
         logging.info("AssemblyAI S2T Blockifier received run request.")
         if request.is_status_check:
@@ -114,7 +114,9 @@ class AssemblyAIBlockifier(Blockifier):
         )
         return response.json().get("id")
 
-    def _process_transcription_response(self, transcription_response: Dict[str, Any]) -> Response:
+    def _process_transcription_response(
+        self, transcription_response: Dict[str, Any]
+    ) -> InvocableResponse:
         timestamp_tags, time_idx_to_char_idx = parse_timestamps(transcription_response)
 
         tags = [
@@ -127,7 +129,7 @@ class AssemblyAIBlockifier(Blockifier):
             *parse_entities(transcription_response, time_idx_to_char_idx),
         ]
 
-        return Response(
+        return InvocableResponse(
             data=BlockAndTagPluginOutput(
                 file=File.CreateRequest(
                     blocks=[
@@ -140,7 +142,7 @@ class AssemblyAIBlockifier(Blockifier):
             )
         )
 
-    def _check_transcription_status(self, transcription_id: str) -> Response:
+    def _check_transcription_status(self, transcription_id: str) -> InvocableResponse:
         response = requests.get(
             f"{self.BASE_URL}/transcript/{transcription_id}",
             headers={"authorization": self.config.assembly_api_token, **self.BASE_HEADERS},
@@ -161,7 +163,7 @@ class AssemblyAIBlockifier(Blockifier):
                     "Please check Assembly AI for error message."
                 )
         else:
-            return Response(
+            return InvocableResponse(
                 status=Task(
                     state=TaskState.running,
                     remote_status_message="Transcription job ongoing.",
@@ -172,36 +174,29 @@ class AssemblyAIBlockifier(Blockifier):
     def _upload_audio_file(self, mime_type: str, data: bytes) -> str:
         media_format = mime_type.split("/")[1]
         unique_file_id = f"{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}-{uuid4()}.{media_format}"
-        s3_client = (
+        ship_client = (
             Steamship(profile="staging")
             if "docker" in str(self.client.config.api_base)
             else self.client
         )
+        workspace = Workspace.get(client=ship_client)
 
-        writing_signed_url = (
-            s3_client.get_space()
-            .create_signed_url(
-                SignedUrl.Request(
-                    bucket=SignedUrl.Bucket.PLUGIN_DATA,
-                    filepath=unique_file_id,
-                    operation=SignedUrl.Operation.WRITE,
-                )
+        writing_signed_url = workspace.create_signed_url(
+            SignedUrl.Request(
+                bucket=SignedUrl.Bucket.PLUGIN_DATA,
+                filepath=unique_file_id,
+                operation=SignedUrl.Operation.WRITE,
             )
-            .data.signed_url
-        )
+        ).signed_url
         upload_to_signed_url(writing_signed_url, data)
 
-        return (
-            s3_client.get_space()
-            .create_signed_url(
-                SignedUrl.Request(
-                    bucket=SignedUrl.Bucket.PLUGIN_DATA,
-                    filepath=unique_file_id,
-                    operation=SignedUrl.Operation.READ,
-                )
+        return workspace.create_signed_url(
+            SignedUrl.Request(
+                bucket=SignedUrl.Bucket.PLUGIN_DATA,
+                filepath=unique_file_id,
+                operation=SignedUrl.Operation.READ,
             )
-            .data.signed_url
-        )
+        ).signed_url
 
     def _check_mime_type(self, request: PluginRequest) -> str:
         mime_type = request.data.default_mime_type

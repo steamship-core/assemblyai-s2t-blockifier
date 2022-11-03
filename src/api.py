@@ -20,7 +20,7 @@ from steamship.plugin.outputs.block_and_tag_plugin_output import BlockAndTagPlug
 from steamship.plugin.request import PluginRequest
 from steamship.utils.signed_urls import upload_to_signed_url
 
-from parsers import (
+from .parsers import (
     parse_chapters,
     parse_entities,
     parse_sentiments,

@@ -48,5 +48,5 @@ jobs:
         run: |
           pytest test/test_unit.py
         env:
-          STEAMSHIP_API_KEY: ${{ github.ref == 'refs/heads/main' && secrets.STEAMSHIP_API_KEY_STAGING || secrets.STEAMSHIP_API_KEY_STAGING  }}
-          STEAMSHIP_API_BASE: ${{ secrets.STEAMSHIP_API_BASE_STAGING }}
+          STEAMSHIP_API_KEY: ${{ github.ref == 'refs/heads/main' && secrets.STEAMSHIP_API_KEY || secrets.STEAMSHIP_API_KEY_STAGING  }}
+          STEAMSHIP_API_BASE: ${{ github.ref == 'refs/heads/main' && secrets.STEAMSHIP_API_KEY || secrets.STEAMSHIP_API_KEY_STAGING }}

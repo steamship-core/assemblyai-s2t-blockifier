@@ -23,7 +23,7 @@ jobs:
         env:
           ASSEMBLY_API_TOKEN: "${{ secrets.API_KEY }}"
         run: |
-          mkdir -p src/.steamship/; echo -e "assembly_api_token =" "\"""$ASSEMBLY_API_TOKEN""\" > src/.steamship/secrets.toml
+          mkdir -p src/.steamship/; echo -e "assembly_api_token =" "\"""$ASSEMBLY_API_TOKEN""\"" > src/.steamship/secrets.toml
       - name: Setup Python
         uses: actions/setup-python@v2
         with:

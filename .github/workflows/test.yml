@@ -18,6 +18,10 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@v2
+      - name: Open Web Client Directory
+        working-directory: test/data
+        run: |
+          ls -la
       - name: Setup secrets file
         shell: bash
         env:

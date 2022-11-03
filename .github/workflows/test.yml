@@ -47,3 +47,6 @@ jobs:
       - name: Run test suite
         run: |
           pytest test/test_unit.py
+        env:
+          STEAMSHIP_API_KEY: ${{ secrets.STEAMSHIP_API_KEY }}
+          STEAMSHIP_API_KEY_STAGING: ${{ secrets.STEAMSHIP_API_KEY_STAGING }}

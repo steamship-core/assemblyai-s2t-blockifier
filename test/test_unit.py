@@ -10,7 +10,7 @@ from steamship.plugin.request import PluginRequest
 
 from src.api import AssemblyAIBlockifier
 
-ENVIRONMENT = "staging"
+ENVIRONMENT = "prod"
 
 
 def _read_test_audio_file(filename: str) -> str:

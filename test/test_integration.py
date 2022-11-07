@@ -1,4 +1,6 @@
 """Test assemblyai-s2t-blockifier via integration tests."""
+import random
+import string
 from test import TEST_DATA
 from test.utils import load_config, verify_file
 
@@ -7,7 +9,7 @@ from steamship import File, PluginInstance, Steamship, Task, TaskState
 from steamship.base.mime_types import MimeTypes
 
 BLOCKIFIER_HANDLE = "s2t-blockifier-default"
-ENVIRONMENT = "staging"
+ENVIRONMENT = "prod"
 
 
 @pytest.fixture
@@ -16,10 +18,24 @@ def steamship() -> Steamship:
     return Steamship(profile=ENVIRONMENT)
 
 
+def random_name() -> str:
+    """Returns a random name suitable for a handle that has low likelihood of colliding with another.
+
+    Output format matches test_[a-z0-9]+, which should be a valid handle.
+    """
+    letters = string.digits + string.ascii_letters
+    return f"test_{''.join(random.choice(letters) for _ in range(10))}".lower()  # noqa: S311
+
+
 @pytest.fixture
 def plugin_instance(steamship: Steamship) -> PluginInstance:
     """Instantiate a plugin instance."""
-    plugin_instance = steamship.use_plugin(plugin_handle=BLOCKIFIER_HANDLE, config=load_config())
+    plugin_instance = steamship.use_plugin(
+        plugin_handle=BLOCKIFIER_HANDLE,
+        instance_handle=random_name(),
+        config=load_config(),
+        fetch_if_exists=False,
+    )
     assert plugin_instance is not None
     assert plugin_instance.id is not None
     return plugin_instance

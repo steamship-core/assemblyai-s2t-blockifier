@@ -19,7 +19,7 @@ def steamship() -> Steamship:
 
 
 def random_name() -> str:
-    """Returns a random name suitable for a handle that has low likelihood of colliding with another.
+    """Return a random name suitable for a handle that has low likelihood of colliding with another.
 
     Output format matches test_[a-z0-9]+, which should be a valid handle.
     """

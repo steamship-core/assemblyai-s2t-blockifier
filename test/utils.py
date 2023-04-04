@@ -33,7 +33,7 @@ def verify_file(file) -> None:
 def verify_block_tags(block):
     """Verify the block."""
     assert len(block.tags) > 0
-    assert isinstance(block.tags[0], (Tag, Tag.CreateRequest))
+    assert isinstance(block.tags[0], Tag)
 
     for tag in block.tags:
         assert tag.name is not None

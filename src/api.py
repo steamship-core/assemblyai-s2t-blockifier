@@ -5,7 +5,7 @@ An audio file is loaded and converted into blocks, with tags added according to 
 import logging
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, Type, Union
+from typing import Any, Dict, Optional, Type, Union
 from uuid import uuid4
 
 import requests
@@ -13,7 +13,7 @@ from steamship import Block, File, Steamship, SteamshipError
 from steamship.base import Task, TaskState
 from steamship.base.mime_types import MimeTypes
 from steamship.data.workspace import SignedUrl, Workspace
-from steamship.invocable import Config, InvocableResponse, create_handler
+from steamship.invocable import Config, InvocableResponse
 from steamship.plugin.blockifier import Blockifier
 from steamship.plugin.inputs.raw_data_plugin_input import RawDataPluginInput
 from steamship.plugin.outputs.block_and_tag_plugin_output import BlockAndTagPluginOutput
@@ -29,14 +29,6 @@ from parsers import (
     parse_topic_summaries,
     parse_topics,
 )
-
-
-class AssemblyAIBlockifierConfig(Config):
-    """Config object containing required configuration parameters to initialize a AssemblyAIBlockifier."""
-
-    assembly_api_token: str
-    speaker_detection: bool = True
-    enable_audio_intelligence: bool = True
 
 
 class TranscribeJobStatus(str, Enum):
@@ -57,6 +49,13 @@ class AssemblyAIBlockifier(Blockifier):
         The required configuration used to instantiate a amazon-s2t-blockifier
     """
 
+    class AssemblyAIBlockifierConfig(Config):
+        """Config object containing required configuration parameters to initialize a AssemblyAIBlockifier."""
+
+        assembly_api_token: Optional[str] = ""
+        speaker_detection: bool = True
+        enable_audio_intelligence: bool = True
+
     config: AssemblyAIBlockifierConfig
 
     SUPPORTED_MIME_TYPES = (
@@ -73,9 +72,10 @@ class AssemblyAIBlockifier(Blockifier):
         "content-type": "application/json",
     }
 
-    def config_cls(self) -> Type[Config]:
-        """Return the Configuration class."""
-        return AssemblyAIBlockifierConfig
+    @classmethod
+    def config_cls(cls) -> Type[Config]:
+        """Return the configuration object for the Transcriber Plugin."""
+        return cls.AssemblyAIBlockifierConfig
 
     def run(
         self, request: PluginRequest[RawDataPluginInput]
@@ -91,8 +91,8 @@ class AssemblyAIBlockifier(Blockifier):
                 request.status.remote_status_input["transcription_id"]
             )
         else:
-            mime_type = self._check_mime_type(request)
-            signed_url = self._upload_audio_file(mime_type, request.data.data)
+            # mime_type = self._check_mime_type(request)
+            signed_url = self._upload_audio_file("test", request.data.data)
             transcription_id = self._start_transcription(file_uri=signed_url)
             return self._check_transcription_status(transcription_id)
 
@@ -131,9 +131,9 @@ class AssemblyAIBlockifier(Blockifier):
 
         return InvocableResponse(
             data=BlockAndTagPluginOutput(
-                file=File.CreateRequest(
+                file=File(
                     blocks=[
-                        Block.CreateRequest(
+                        Block(
                             text=transcription_response["text"],
                             tags=tags,
                         )
@@ -147,6 +147,14 @@ class AssemblyAIBlockifier(Blockifier):
             f"{self.BASE_URL}/transcript/{transcription_id}",
             headers={"authorization": self.config.assembly_api_token, **self.BASE_HEADERS},
         )
+        if not response.ok:
+            try:
+                error = response.json()["error"]
+                raise SteamshipError(message="Transcription was unsuccessful. " f"Error: {error}")
+            except Exception:
+                raise SteamshipError(
+                    message="Transcription was unsuccessful. Please contact support of this persists."
+                )
         transcription_response = response.json()
         job_status = transcription_response["status"]
         logging.info(f"Job {transcription_id} has status {job_status}.")
@@ -159,8 +167,7 @@ class AssemblyAIBlockifier(Blockifier):
                 return self._process_transcription_response(transcription_response)
             else:
                 raise SteamshipError(
-                    message="Transcription was unsuccessful. "
-                    "Please check Assembly AI for error message."
+                    message="Transcription was unsuccessful. Please contact support of this persists."
                 )
         else:
             return InvocableResponse(
@@ -172,8 +179,8 @@ class AssemblyAIBlockifier(Blockifier):
             )
 
     def _upload_audio_file(self, mime_type: str, data: bytes) -> str:
-        media_format = mime_type.split("/")[1]
-        unique_file_id = f"{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}-{uuid4()}.{media_format}"
+        # media_format = mime_type.split("/")[1]
+        unique_file_id = f"{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}-{uuid4()}"
         ship_client = (
             Steamship(profile="staging")
             if "docker" in str(self.client.config.api_base)
@@ -198,14 +205,11 @@ class AssemblyAIBlockifier(Blockifier):
             )
         ).signed_url
 
-    def _check_mime_type(self, request: PluginRequest) -> str:
-        mime_type = request.data.default_mime_type
-        if mime_type not in self.SUPPORTED_MIME_TYPES:
-            raise SteamshipError(
-                "Unsupported mimeType. "
-                f"The following mimeTypes are supported: {self.SUPPORTED_MIME_TYPES}"
-            )
-        return mime_type
-
-
-handler = create_handler(AssemblyAIBlockifier)
+    # def _check_mime_type(self, request: PluginRequest) -> str:
+    #     mime_type = request.data.default_mime_type
+    #     if mime_type not in self.SUPPORTED_MIME_TYPES:
+    #         raise SteamshipError(
+    #             "Unsupported mimeType. "
+    #             f"The following mimeTypes are supported: {self.SUPPORTED_MIME_TYPES}"
+    #         )
+    #     return mime_type

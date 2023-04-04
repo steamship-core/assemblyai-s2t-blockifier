@@ -10,7 +10,7 @@ def parse_speaker_tags(transcription_response):
         for utterance in transcription_response["utterances"] or []:
             utterance_length = len(utterance["text"])
             tags.append(
-                Tag.CreateRequest(
+                Tag(
                     kind="speaker",
                     start_idx=utterance_index,
                     end_idx=utterance_index + utterance_length,
@@ -30,7 +30,7 @@ def parse_timestamps(transcription_response):
     for word in transcription_response["words"]:
         word_length = len(word["text"])
         tags.append(
-            Tag.CreateRequest(
+            Tag(
                 kind="timestamp",
                 start_idx=char_idx,
                 end_idx=char_idx + word_length,
@@ -50,7 +50,7 @@ def parse_entities(transcription_response, time_idx_to_char_idx):
     if "entities" in transcription_response:
         for entity in transcription_response["entities"]:
             tags.append(
-                Tag.CreateRequest(
+                Tag(
                     kind="entity",
                     name=entity["text"],
                     value={
@@ -71,7 +71,7 @@ def parse_chapters(transcription_response, time_idx_to_char_idx):
     if "chapters" in transcription_response:
         for ix, chapter in enumerate(transcription_response["chapters"]):
             tags.append(
-                Tag.CreateRequest(
+                Tag(
                     kind="chapter",
                     name=f"{ix}",
                     value={
@@ -96,7 +96,7 @@ def parse_sentiments(transcription_response):
         for sentiment in transcription_response["sentiment_analysis_results"]:
             span_text = sentiment["text"]
             tags.append(
-                Tag.CreateRequest(
+                Tag(
                     kind="sentiment",
                     name=sentiment["sentiment"],
                     value={
@@ -119,7 +119,7 @@ def parse_topic_summaries(transcription_response):
         summary = transcription_response["iab_categories_result"]["summary"]
         for topic, relevance in summary.items():
             tags.append(
-                Tag.CreateRequest(
+                Tag(
                     kind="topic_summary",
                     name=topic,
                     value={
@@ -145,7 +145,7 @@ def parse_topics(transcription_response):
             end_time = topic_fragment["timestamp"]["end"]
             for label in topic_fragment["labels"]:
                 tags.append(
-                    Tag.CreateRequest(
+                    Tag(
                         kind="topic",
                         name=label["label"],
                         value={

@@ -58,15 +58,6 @@ class AssemblyAIBlockifier(Blockifier):
 
     config: AssemblyAIBlockifierConfig
 
-    SUPPORTED_MIME_TYPES = (
-        MimeTypes.MP3,
-        MimeTypes.WAV,
-        "video/mp4",
-        "audio/mp4",
-        "audio/webm",
-        "video/webm",
-    )
-
     BASE_URL = "https://api.assemblyai.com/v2"
     BASE_HEADERS = {
         "content-type": "application/json",

@@ -1,7 +1,7 @@
 {
 	"type": "plugin",
-	"handle": "s2t-blockifier-default",
-	"version": "3.0.3",
+	"handle": "s2t-blockifier-assembly",
+	"version": "3.1.0",
 	"description": "Blockify audio via Assembly AI",
 	"author": "",
 	"entrypoint": "src.api.handler",

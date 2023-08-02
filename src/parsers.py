@@ -48,7 +48,7 @@ def parse_entities(transcription_response, time_idx_to_char_idx):
     """Extract entity tags from transcription response."""
     tags = []
     if "entities" in transcription_response:
-        for entity in transcription_response["entities"]:
+        for entity in transcription_response["entities"] or []:
             tags.append(
                 Tag(
                     kind="entity",
@@ -69,7 +69,7 @@ def parse_chapters(transcription_response, time_idx_to_char_idx):
     """Extract chapters and corresponding summaries from transcription response."""
     tags = []
     if "chapters" in transcription_response:
-        for ix, chapter in enumerate(transcription_response["chapters"]):
+        for ix, chapter in enumerate(transcription_response["chapters"] or []):
             tags.append(
                 Tag(
                     kind="chapter",
@@ -93,7 +93,7 @@ def parse_sentiments(transcription_response):
     tags = []
     if "sentiment_analysis_results" in transcription_response:
         char_idx = 0
-        for sentiment in transcription_response["sentiment_analysis_results"]:
+        for sentiment in transcription_response.get("sentiment_analysis_results") or []:
             span_text = sentiment["text"]
             tags.append(
                 Tag(
